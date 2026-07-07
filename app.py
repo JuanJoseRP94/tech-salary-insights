@@ -7,8 +7,10 @@ Ejecutar con: streamlit run app.py
 
 import sys
 import os
-
+from dotenv import load_dotenv
+load_dotenv()
 import streamlit as st
+
 
 # Permite importar los módulos de src/ sin instalarlos como paquete.
 sys.path.append(os.path.join(os.path.dirname(__file__), "src"))
@@ -21,6 +23,19 @@ from visualizations import (  # noqa: E402
     fig_salary_trend,
     fig_company_size_comparison,
 )
+from llm_insights import ask_question  # noqa: E402
+
+
+def get_groq_api_key():
+    """
+    Busca la API key de Groq primero en st.secrets (usado en Streamlit Cloud),
+    y si no existe, en variables de entorno (usado en desarrollo local con .env).
+    Devuelve None si no se encuentra en ningún sitio.
+    """
+    try:
+        return st.secrets["GROQ_API_KEY"]
+    except (KeyError, FileNotFoundError):
+        return os.environ.get("GROQ_API_KEY")
 
 st.set_page_config(
     page_title="Tech Salary Insights",
@@ -98,6 +113,40 @@ def main():
 
     with st.expander("Ver datos en bruto"):
         st.dataframe(filtered_df, use_container_width=True)
+
+    st.divider()
+
+    # --- Sección de IA generativa: "Pregunta a tus datos" ---
+    st.subheader("🤖 Pregunta a tus datos")
+    st.caption(
+        "Escribe una pregunta en lenguaje natural sobre los datos filtrados "
+        "arriba. Un modelo de IA generativa (Llama 3.3 vía Groq) analizará el "
+        "resumen estadístico real y te responderá."
+    )
+
+    api_key = get_groq_api_key()
+
+    if not api_key:
+        st.info(
+            "Esta función necesita una clave gratuita de Groq. "
+            "Consulta el README del proyecto para configurarla en 2 minutos."
+        )
+    else:
+        question = st.text_input(
+            "Tu pregunta",
+            placeholder="Ej: ¿Cuánto más gana un Senior que un Junior en este subconjunto?",
+        )
+        if st.button("Preguntar") and question:
+            with st.spinner("Analizando los datos..."):
+                try:
+                    answer = ask_question(question, filtered_df, api_key)
+                    # Escapamos los símbolos $ para que Streamlit no los
+                    # interprete como fórmulas matemáticas (LaTeX).
+                    safe_answer = answer.replace("$", r"\$")
+                    st.success(safe_answer)
+                    st.success(answer)
+                except Exception as e:
+                    st.error(f"No se pudo obtener respuesta: {e}")
 
 
 if __name__ == "__main__":
