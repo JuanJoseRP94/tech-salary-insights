@@ -5,7 +5,14 @@ Carga y limpieza del dataset de salarios tech.
 Fuente: https://github.com/foorilla/ai-jobs-net-salaries (dominio público, CC0)
 """
 
+import os
+import urllib.request
+
 import pandas as pd
+
+DATASET_URL = "https://raw.githubusercontent.com/foorilla/ai-jobs-net-salaries/main/salaries.csv"
+
+# Mapeos para convertir los códigos del dataset original en etiquetas legibles.
 
 # Mapeos para convertir los códigos del dataset original en etiquetas legibles.
 EXPERIENCE_LABELS = {
@@ -39,6 +46,12 @@ def load_salaries(path: str = "data/salaries.csv") -> pd.DataFrame:
     Returns:
         DataFrame limpio y enriquecido con etiquetas legibles.
     """
+    # Si el CSV no existe (p.ej. en Streamlit Cloud, donde no se sube a Git),
+    # lo descargamos automáticamente desde la fuente pública antes de leerlo.
+    if not os.path.exists(path):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        urllib.request.urlretrieve(DATASET_URL, path)
+
     df = pd.read_csv(path)
 
     # Copiamos en vez de mutar in-place, buena práctica para evitar
